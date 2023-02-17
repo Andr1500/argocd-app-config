@@ -16,4 +16,4 @@ spec:
       - name: myapp
         image: nginx:1.23.3-alpine-slim
         ports:
-        - containerPort: 80
+        - containerPort: 8080
