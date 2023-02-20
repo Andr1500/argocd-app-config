@@ -1,0 +1,136 @@
+gitops
+
+IaC hosted on git repo : version controlled, team collaboration,
+
+create pull/merge request, make changes, every change trigger CI pipeline for validation config files and run automated tests
+
+after that approve changes and merge to main branch and CD pipeline will deploy it to env automatically
+
+we have push or pull based deployments
+
+push: push to deployments env
+
+pull: agent installed in the env and pulls from repo. tool as ArgoCD
+
+advantages: less permisson to manage and more secure env
+
+gitops is: IaC, version control, pull/merge requests, ci/cd pipeline
+
+
+ArgoCD:
+
+challenges with "traditonal" configuration, like Jenkins:
+
+install and setup tools, like kubectl
+
+config access to k8s
+
+config access to cloud platform (f.e. aws)
+
+security challenges
+
+no visibility of deployment status
+
+
+ArgoCD reverse the flow: ArgoCD is a part of k8s cluster, agent pulls k8s manifest changes and applies them
+
+best practice for git repos: separate epos for apps source code and app configs (k8s manifest files)
+
+
+benefits:
+
+whole k8s configuration defined as code in git repo
+
+config files are not applied manually from local laptops
+
+same interface for updating the cluster (git comit ...)
+
+git as single source of truth : single interface, version controlled changes, history changes, better team collaboration
+
+easy rollback
+
+cluster disaster recovery
+
+argo can detect changes which were done manually and overwrite the manual change ,
+we can configure ArgoCD to not sync manual cluster changes automatically but send alert instead
+
+k8s access control with git
+
+ArgoCD as k8s extension: uses etcd, k8s functionalities, k8s controllers , benefits of it --> real time updates of app state
+
+
+configuration of ArgoCD:
+
+deploy ArgoCD into k8s cluster
+
+configure ArgoCD with k8s yaml file :  git repo and cluster url
+
+it's posible work with multiple clusters: config 1 ArgoCD and same ArgoCD instance is able to sync a fleet of k8s clusters
+
+also it's possible have ArgoCD on every cluster and 1 git repo, but but work dependetly depends on environment cluster (first dev, next - staging...)
+we can do it with different git branches for each env, or we can do that with overlays with kustomize
+
+alternatives: flux, jenkinsX
+
+Demo:
+
+steps to do: install ArgoCD in k8s cluster, configure ArgoCD with app CRD
+
+install ArgoCD :
+
+run cluster in minikube
+
+minikube start --cpus 2 --memory 4096 --vm-driver docker
+
+main doc: https://argo-cd.readthedocs.io/en/stable/getting_started/#syncing-via-cli
+
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+access to ArgoCD UI
+
+check services: k get svc -n argocd
+
+port forwarding of argocd server: kubectl port-forward svc/argocd-server -n argocd 8080:443
+
+get password for login:
+
+ k get secret argocd-initial-admin-secret -n argocd -o yaml
+
+ decode password: echo W__Pass__== | base64 --decode
+
+ configure ArgoCD :
+
+ A minimal Application spec is as follows:
+https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/
+
+basic config:
+------------------------------------------------
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: myapp-argo-applocation
+  namespace: argocd
+spec:
+  project: default
+
+  destination:
+    server: https://kubernetes.default.svc #endpoint of k8s api server
+    namespace: myapp #if it doesn't exist, argo will creae it
+
+  syncPolicy:
+    syncOptions:
+    - CreateNamespace=true
+
+    automated:
+      selfHeal: true #automatically revert changes in case of any manual changes
+      prune: true
+--------------------------------------------
+
+we can access https://kubernetes.default.svc because argo is deployed inside the destination cluster
+
+by default argo pools changes every 3 minutes, it's possible to config it with min delay with git webhook
+
+next. it is necessary to apply our app config:
+
+k apply -f application.yaml
